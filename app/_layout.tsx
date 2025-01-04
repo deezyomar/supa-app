@@ -1,59 +1,55 @@
+import { supabase } from '@/utils/supabase';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { Session } from '@supabase/supabase-js';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { useSegments, useRouter, Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/components/useColorScheme';
+import { useEffect, useState } from 'react';
+import {useAnimatedStyle, useSharedValue, withSequence, withTiming, withRepeat} from 'react-native-reanimated';
 
 export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from 'expo-router';
 
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+
+
+const InitialLayout = () => {
+const [session, setSettion] = useState<Session | null>(null);
+const [initialized, setInitialized ] = useState(false);
+
+const segments = useSegments();
+const router = useRouter();
+
+
+
+  useEffect(() => {
+    const {data} = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('supabase.auth.onAuthStateChange', event, session)
+      setSettion(session);
+      setInitialized(true);
+    });
+  
+    return () => {
+      data.subscription.unsubscribe();
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!initialized) return;
+    
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (session && !inAuthGroup) {
+      router.replace('/(auth)');
+    } else if (!session) {
+      router.replace('/');
+    }
+  }, [initialized, session]);
+
+  return <Slot />;
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+  
 
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    ...FontAwesome.font,
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
-  );
-}
+export default InitialLayout
